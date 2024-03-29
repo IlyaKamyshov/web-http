@@ -6,18 +6,19 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class Server {
 
-    final List<String> validPaths = List.of("/index.html", "/spring.svg", "/spring.png", "/resources.html", "/styles.css", "/app.js", "/links.html", "/forms.html", "/classic.html", "/events.html", "/events.js");
-
-    ExecutorService threadPool;
+    // Самый простой способ хранить хендлеры — это использовать в качестве ключей метод и путь.
+    // Можно сделать как Map внутри Map, так и отдельные Map на каждый метод.
+    final Map<String, Map<String, Handler>> handlers = new ConcurrentHashMap<>();
+    final ExecutorService threadPool;
 
     public Server(int poolSize) {
         this.threadPool = Executors.newFixedThreadPool(poolSize);
@@ -43,58 +44,55 @@ public class Server {
             final var requestLine = in.readLine();
             final var parts = requestLine.split(" ");
 
+            final var method = parts[0];
+            final var path = parts[1];
+
+
             if (parts.length != 3) {
                 // just close socket
+                Status.StatusCode400(out);
                 return;
             }
 
-            final var path = parts[1];
-            if (!validPaths.contains(path)) {
-                out.write((
-                        "HTTP/1.1 404 Not Found\r\n" +
-                                "Content-Length: 0\r\n" +
-                                "Connection: close\r\n" +
-                                "\r\n"
-                ).getBytes());
-                out.flush();
+            // read next lines
+            // find headers
+            String line;
+            final Map<String, String> headers = new HashMap<>();
+            while (!(line= in.readLine()).equals("")){
+                int indexOf = line.indexOf(":");
+                String name = line.substring(0, indexOf);
+                String value = line.substring(indexOf + 2);
+                headers.put(name,value);
+            }
+
+            // Вы принимаете запрос, парсите его целиком, как мы сделали на лекции, и собираете объект, типа Request.
+            final var request = new Request(method, path, socket.getInputStream(), headers);
+
+            // На основании данных из Request вы выбираете хендлер (он может быть только один),
+            // который и будет обрабатывать запрос.
+            // Поиск хендлера заключается в том, что вы выбираете по нужному методу все зарегистрированные хендлеры,
+            // а затем перебираете по пути. Используйте пока точное соответствие: считайте, что у вас все
+            // запросы без Query String.
+            // Найдя нужный хендлер, достаточно вызвать его метод handle, передав туда Request и BufferedOutputStream.
+            var handler = handlers.get(request.getMethod()).get(request.getPath());
+
+            if (handler == null) {
+                Status.StatusCode404(out);
                 return;
             }
 
-            final var filePath = Path.of(".", "public", path);
-            final var mimeType = Files.probeContentType(filePath);
-
-            // special case for classic
-            if (path.equals("/classic.html")) {
-                final var template = Files.readString(filePath);
-                final var content = template.replace(
-                        "{time}",
-                        LocalDateTime.now().toString()
-                ).getBytes();
-                out.write((
-                        "HTTP/1.1 200 OK\r\n" +
-                                "Content-Type: " + mimeType + "\r\n" +
-                                "Content-Length: " + content.length + "\r\n" +
-                                "Connection: close\r\n" +
-                                "\r\n"
-                ).getBytes());
-                out.write(content);
-                out.flush();
-                return;
-            }
-
-            final var length = Files.size(filePath);
-            out.write((
-                    "HTTP/1.1 200 OK\r\n" +
-                            "Content-Type: " + mimeType + "\r\n" +
-                            "Content-Length: " + length + "\r\n" +
-                            "Connection: close\r\n" +
-                            "\r\n"
-            ).getBytes());
-            Files.copy(filePath, out);
-            out.flush();
+            handler.handle(request, out);
 
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
+    public void addHandler(String method, String path, Handler handler) {
+        if (!handlers.containsKey(method)) {
+            handlers.put(method, new ConcurrentHashMap<>());
+        }
+        handlers.get(method).put(path, handler);
+    }
+
 }

@@ -1,14 +1,10 @@
 package org.example;
 
-import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URISyntaxException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -37,36 +33,14 @@ public class Server {
 
     private void connection(Socket socket) {
         try (socket;
-             final var in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+             final var in = new BufferedInputStream(socket.getInputStream());
              final var out = new BufferedOutputStream(socket.getOutputStream())) {
-            // read only request line for simplicity
-            // must be in form GET /path HTTP/1.1
-            final var requestLine = in.readLine();
-            final var parts = requestLine.split(" ");
 
-            final var method = parts[0];
-            final var path = parts[1];
-
-
-            if (parts.length != 3) {
-                // just close socket
-                Status.StatusCode400(out);
-                return;
-            }
-
-            // read next lines
-            // find headers
-            String line;
-            final Map<String, String> headers = new HashMap<>();
-            while (!(line= in.readLine()).equals("")){
-                int indexOf = line.indexOf(":");
-                String name = line.substring(0, indexOf);
-                String value = line.substring(indexOf + 2);
-                headers.put(name,value);
-            }
+            RequestParser parser = new RequestParser(in, out);
 
             // Вы принимаете запрос, парсите его целиком, как мы сделали на лекции, и собираете объект, типа Request.
-            final var request = new Request(method, path, socket.getInputStream(), headers);
+            final var request = new Request(parser.getMethod(), parser.getPath(), parser.getBody(), parser.getHeaders(),
+                    parser.getQueryParams(), parser.getPostParams());
 
             // На основании данных из Request вы выбираете хендлер (он может быть только один),
             // который и будет обрабатывать запрос.
@@ -81,8 +55,8 @@ public class Server {
                 return;
             }
 
-//            System.out.println("\n" + request);
-//            System.out.println("\n" + request.getQueryParam("type"));
+            System.out.println("\n" + request);
+//            System.out.println("\n" + request.getPostParam("value"));
 
             handler.handle(request, out);
 

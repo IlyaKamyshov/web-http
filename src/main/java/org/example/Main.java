@@ -6,31 +6,25 @@ public class Main {
 
     final static int POOL_SIZE = 64;
     final static int PORT = 9999;
+    public static final String GET = "GET";
+    public static final String POST = "POST";
 
     public static void main(String[] args) {
         Server server = new Server(POOL_SIZE);
 
-        // добавление хендлеров (обработчиков) для // ("/index.html", "/spring.svg", "/spring.png", "/resources.html",
-        // "/styles.css", "/app.js", "/links.html", "/forms.html", "/classic.html", "/events.html", "/events.js");
-        server.addHandler("GET", "/classic.html", (request, out) -> {
+        // добавление хендлеров (обработчиков)
+
+        server.addHandler(GET, "/default-get.html", (request, out) -> {
             try{
-                Handlers.classicGET(request, out);
+                Handlers.formHandler(request, out);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         });
 
-        server.addHandler("GET", "/index.html", (request, out) -> {
+        server.addHandler(POST, "/default-get.html", (request, out) -> {
             try{
-                Handlers.modernGET(request, out);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        });
-
-        server.addHandler("PUT", "/resources.html", (request, out) -> {
-            try{
-                Handlers.modernGET(request, out);
+                Handlers.formHandler(request, out);
             } catch (IOException e) {
                 e.printStackTrace();
             }

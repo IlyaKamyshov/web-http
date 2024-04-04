@@ -1,38 +1,35 @@
 package org.example;
 
 import org.apache.hc.core5.http.NameValuePair;
-import org.apache.hc.core5.net.URLEncodedUtils;
 
-import java.io.InputStream;
-import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.charset.Charset;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
 public class Request {
     private final String method;
     private final String path;
-    private final InputStream body;
-    private final Map<String,String> headers;
+    private final String body;
+    private final List<String> headers;
     private final List<NameValuePair> queryParams;
+    private final List<NameValuePair> postParams;
 
-    public Request(String method, String path, InputStream body, Map<String,String> headers) throws URISyntaxException {
+    public Request(String method, String path, String body, List<String> headers,
+                   List<NameValuePair> queryParams, List<NameValuePair> postParams) throws URISyntaxException {
         this.method = method;
-        URI uri = new URI(path);
-        this.path = uri.getPath();
+        this.path = path;
         this.body = body;
-        this.headers =headers;
-        this.queryParams = URLEncodedUtils.parse(uri, Charset.defaultCharset());
+        this.headers = headers;
+        this.queryParams = queryParams;
+        this.postParams = postParams;
     }
 
-    public String getMethod(){
+    public String getMethod() {
         return method;
     }
 
-    public String getPath(){
+    public String getPath() {
         return path;
     }
 
@@ -47,12 +44,24 @@ public class Request {
                 .collect(Collectors.toList());
     }
 
+    public List<NameValuePair> getPostParams() {
+        return postParams;
+    }
+
+    public List<String> getPostParam(String name) {
+        return postParams.stream()
+                .filter(param -> Objects.equals(param.getName(), name))
+                .map(param -> param.getValue())
+                .collect(Collectors.toList());
+    }
+
     @Override
-    public String toString(){
+    public String toString() {
         return "Request{" +
                 "method='" + method + '\'' +
                 ", path='" + path + '\'' +
                 ", query=" + queryParams + '\'' +
+                ", post=" + postParams + '\'' +
                 ", headers=" + headers +
                 ", body='" + body + '\'' +
                 '}';

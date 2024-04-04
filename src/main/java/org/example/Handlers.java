@@ -33,5 +33,17 @@ public class Handlers {
 
     }
 
+    static void formHandler(Request request, BufferedOutputStream out) throws IOException {
+
+        final var filePath = Path.of(".", "static", request.getPath());
+        final var mimeType = Files.probeContentType(filePath);
+        final var length = Files.size(filePath);
+
+        Status.StatusCode200(out, mimeType, length);
+        Files.copy(filePath, out);
+        out.flush();
+
+    }
+
 
 }

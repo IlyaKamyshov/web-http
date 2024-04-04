@@ -1,36 +1,49 @@
 package org.example;
 
+import org.apache.commons.fileupload.RequestContext;
 import org.apache.hc.core5.http.NameValuePair;
 
-import java.net.URISyntaxException;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-public class Request {
-    private final String method;
-    private final String path;
-    private final String body;
-    private final List<String> headers;
-    private final List<NameValuePair> queryParams;
-    private final List<NameValuePair> postParams;
+public class Request implements RequestContext {
+    private String method;
+    private String path;
+    private byte[] body;
+    private List<String> headers;
+    private List<NameValuePair> queryParams;
+    private List<NameValuePair> postParams;
+    private String contentType;
+    private int contentLength;
 
-    public Request(String method, String path, String body, List<String> headers,
-                   List<NameValuePair> queryParams, List<NameValuePair> postParams) throws URISyntaxException {
+    public void setMethod(String method) {
         this.method = method;
-        this.path = path;
-        this.body = body;
-        this.headers = headers;
-        this.queryParams = queryParams;
-        this.postParams = postParams;
     }
 
     public String getMethod() {
         return method;
     }
 
+    public void setPath(String path) {
+        this.path = path;
+    }
+
     public String getPath() {
         return path;
+    }
+    public void setBody(byte[] body) {
+        this.body = body;
+    }
+
+    public void setHeaders(List<String> headers) {
+        this.headers = headers;
+    }
+
+    public void setQueryParams(List<NameValuePair> queryParams) {
+        this.queryParams = queryParams;
     }
 
     public List<NameValuePair> getQueryParams() {
@@ -42,6 +55,10 @@ public class Request {
                 .filter(param -> Objects.equals(param.getName(), name))
                 .map(param -> param.getValue())
                 .collect(Collectors.toList());
+    }
+
+    public void setPostParams(List<NameValuePair> postParams) {
+        this.postParams = postParams;
     }
 
     public List<NameValuePair> getPostParams() {
@@ -63,7 +80,36 @@ public class Request {
                 ", query=" + queryParams + '\'' +
                 ", post=" + postParams + '\'' +
                 ", headers=" + headers +
-                ", body='" + body + '\'' +
+                ", body='" + new String(body) + '\'' +
                 '}';
     }
+
+    @Override
+    public String getCharacterEncoding() {
+        return "UTF-8";
+    }
+
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
+    }
+
+    @Override
+    public String getContentType() {
+        return contentType;
+    }
+
+    public void setContentLength(int contentLength) {
+        this.contentLength = contentLength;
+    }
+
+    @Override
+    public int getContentLength() {
+        return contentLength;
+    }
+
+    @Override
+    public InputStream getInputStream() {
+        return new ByteArrayInputStream(body);
+    }
+
 }

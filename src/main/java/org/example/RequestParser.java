@@ -1,28 +1,19 @@
 package org.example;
 
-import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.net.URLEncodedUtils;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 import static org.example.Main.GET;
 
 
 public class RequestParser {
 
-    private String method, path, body;
-    private List<String> headers;
-    private List<NameValuePair> queryParams, postParams;
-
-    public RequestParser(BufferedInputStream in, BufferedOutputStream out) throws IOException, URISyntaxException {
+    public RequestParser(BufferedInputStream in, BufferedOutputStream out, Request request) throws IOException, URISyntaxException {
         // лимит на request line + заголовки
         final var limit = 4096;
 
@@ -45,9 +36,12 @@ public class RequestParser {
             return;
         }
 
-        method = requestLine[0];
-        URI uri = new URI(requestLine[1]);
-        path = uri.getPath();
+        final var method = requestLine[0];
+        request.setMethod(method);
+
+        final var uri = new URI(requestLine[1]);
+        final var path = uri.getPath();
+        request.setPath(path);
 
         // ищем заголовки
         final var headersDelimiter = new byte[]{'\r', '\n', '\r', '\n'};
@@ -64,55 +58,41 @@ public class RequestParser {
         in.skip(headersStart);
 
         final var headersBytes = in.readNBytes(headersEnd - headersStart);
-        headers = Arrays.asList(new String(headersBytes).split("\r\n"));
+        final var headers = Arrays.asList(new String(headersBytes).split("\r\n"));
+        request.setHeaders(headers);
 
         if (method.equals(GET)) {
-            queryParams = URLEncodedUtils.parse(uri, Charset.defaultCharset());
+            final var queryParams = URLEncodedUtils.parse(uri, Charset.defaultCharset());
+            request.setQueryParams(queryParams);
         }
 
         // для GET тела нет
         if (!method.equals(GET)) {
+            var body = "";
             in.skip(headersDelimiter.length);
             // вычитываем Content-Length, чтобы прочитать body
             final var contentLength = extractHeader(headers, "Content-Length");
             if (contentLength.isPresent()) {
                 final var length = Integer.parseInt(contentLength.get());
+
                 final var bodyBytes = in.readNBytes(length);
                 body = new String(bodyBytes);
+                request.setBody(bodyBytes);
             }
-            // получаем параметры, переданные в теле запроса в случае application/x-www-form-urlencoded
+            // получаем параметры, переданные в теле запроса
             final var contentType = extractHeader(headers, "Content-Type");
             if (contentType.isPresent()) {
                 if (contentType.get().equals("application/x-www-form-urlencoded")) {
-                    postParams = URLEncodedUtils.parse(body, Charset.defaultCharset());
-                    System.out.println(postParams);
+                    final var postParams = URLEncodedUtils.parse(body, Charset.defaultCharset());
+                    request.setPostParams(postParams);
+                }
+                if (contentType.get().contains("multipart/form-data")) {
+                    request.setContentType(contentType.get());
+                    final var postParams = FileUploader.doPost(request);
+                    request.setPostParams(postParams);
                 }
             }
         }
-    }
-
-    public String getMethod() {
-        return method;
-    }
-
-    public String getPath() {
-        return path;
-    }
-
-    public String getBody() {
-        return body;
-    }
-
-    public List<String> getHeaders() {
-        return headers;
-    }
-
-    public List<NameValuePair> getQueryParams() {
-        return queryParams;
-    }
-
-    public List<NameValuePair> getPostParams() {
-        return postParams;
     }
 
     private static int indexOf(byte[] array, byte[] target, int start, int max) {

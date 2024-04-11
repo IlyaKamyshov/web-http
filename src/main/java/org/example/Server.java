@@ -36,11 +36,9 @@ public class Server {
              final var in = new BufferedInputStream(socket.getInputStream());
              final var out = new BufferedOutputStream(socket.getOutputStream())) {
 
-            RequestParser parser = new RequestParser(in, out);
-
             // Вы принимаете запрос, парсите его целиком, как мы сделали на лекции, и собираете объект, типа Request.
-            final var request = new Request(parser.getMethod(), parser.getPath(), parser.getBody(), parser.getHeaders(),
-                    parser.getQueryParams(), parser.getPostParams());
+            final var request = new Request();
+            final var parser = new RequestParser(in, out, request);
 
             // На основании данных из Request вы выбираете хендлер (он может быть только один),
             // который и будет обрабатывать запрос.
